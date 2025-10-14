@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2025-01-15
+
+### Changed
+- Improved code formatting following PEP 8 standards
+- Updated README with MIT license badge and acknowledgments
+- Added demo GIF with border styling
+- Enhanced project description as starting point for plugin development
+
+### Fixed
+- Removed unused import (re module)
+- Cleaned up status messages for consistency
+
 ## [1.0.0] - 2025-01-15
 
 ### Added

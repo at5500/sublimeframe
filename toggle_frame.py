@@ -1,80 +1,79 @@
 import sublime
 import sublime_plugin
-import re
 
 
 class ToggleFrameCommand(sublime_plugin.TextCommand):
-    """Команда для добавления/удаления ASCII рамки вокруг выделенного текста"""
+    """Command to add or remove ASCII frames around selected text."""
 
     def run(self, edit):
         for region in self.view.sel():
             if region.empty():
-                # Курсор без выделения - проверяем, находимся ли внутри рамки
+                # No selection - check if cursor is inside a frame
                 row, col = self.view.rowcol(region.begin())
                 line = self.get_line_text(row)
 
                 if self.is_inside_frame(region.begin()):
-                    sublime.status_message("Удаление рамки... (строка {}, колонка {})".format(row, col))
+                    sublime.status_message("Removing frame... (row {}, col {})".format(row, col))
                     self.remove_frame(edit, region.begin())
                 else:
-                    sublime.status_message("Рамка не найдена. Строка: '{}'".format(line[:50]))
+                    sublime.status_message("Frame not found. Line: '{}'".format(line[:50]))
             else:
-                # Есть выделение - добавляем рамку
+                # Has selection - add frame
                 self.add_frame(edit, region)
 
     def is_inside_frame(self, position):
-        """Проверяет, находится ли позиция внутри рамки"""
+        """Check if position is inside a frame."""
         row, col = self.view.rowcol(position)
         line = self.get_line_text(row)
 
         if not line:
             return False
 
-        # Ищем символ │ слева от курсора (включая позицию курсора)
+        # Find │ character to the left of cursor (including cursor position)
         left_border_pos = -1
         for i in range(min(col, len(line) - 1), -1, -1):
             if line[i] == '│':
                 left_border_pos = i
                 break
 
-        # Ищем символ │ справа от курсора
+        # Find │ character to the right of cursor
         right_border_pos = -1
         for i in range(col, len(line)):
             if line[i] == '│':
                 right_border_pos = i
                 break
 
-        # Если есть границы с обеих сторон - мы внутри рамки
-        # left_border_pos должен быть левее курсора или на той же позиции
-        # right_border_pos должен быть правее курсора
+        # If there are borders on both sides - we're inside a frame
+        # left_border_pos should be to the left or at cursor position
+        # right_border_pos should be to the right of cursor
         return 0 <= left_border_pos <= col < right_border_pos
 
     def remove_frame(self, edit, position):
-        """Удаляет рамку вокруг позиции"""
+        """Remove frame around position."""
         row, col = self.view.rowcol(position)
         current_line = self.get_line_text(row)
 
-        # Определяем левую и правую границы на текущей строке
+        # Determine left and right borders on current line
         left_border_col = -1
         right_border_col = -1
 
-        # Ищем левую границу (ближайший │ слева от курсора)
+        # Find left border (nearest │ to the left of cursor)
         for i in range(min(col, len(current_line) - 1), -1, -1):
             if current_line[i] == '│':
                 left_border_col = i
                 break
 
-        # Ищем правую границу (ближайший │ справа от курсора)
+        # Find right border (nearest │ to the right of cursor)
         for i in range(col, len(current_line)):
             if current_line[i] == '│':
                 right_border_col = i
                 break
 
         if left_border_col == -1 or right_border_col == -1:
-            sublime.status_message("Курсор не находится внутри рамки")
+            sublime.status_message("Cursor is not inside a frame")
             return
 
-        # Ищем САМУЮ ВНЕШНЮЮ верхнюю границу, расширяя поиск
+        # Find the OUTERMOST top border, expanding search
         top_row = None
         final_left = left_border_col
         final_right = right_border_col
@@ -82,79 +81,79 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
         for r in range(row - 1, max(row - 100, -1), -1):
             line = self.get_line_text(r)
 
-            # Проверяем, есть ли на этой строке верхняя граница для текущих границ
+            # Check if this line has top border for current borders
             if len(line) > final_left and len(line) > final_right:
                 if line[final_left] == '┌' and line[final_right] == '┐':
-                    # Нашли верхнюю границу, запоминаем её
+                    # Found top border, remember it
                     top_row = r
 
-                    # Пробуем найти еще более внешнюю рамку
-                    # Ищем │ слева от текущей левой границы
+                    # Try to find even more outer frame
+                    # Look for │ to the left of current left border
                     new_left = -1
                     for i in range(final_left - 1, -1, -1):
                         if i < len(line) and line[i] == '│':
                             new_left = i
                             break
 
-                    # Ищем │ справа от текущей правой границы
+                    # Look for │ to the right of current right border
                     new_right = -1
                     for i in range(final_right + 1, len(line)):
                         if line[i] == '│':
                             new_right = i
                             break
 
-                    # Если нашли более внешние границы, расширяем поиск
+                    # If found more outer borders, expand search
                     if new_left >= 0 and new_right > new_left:
                         final_left = new_left
                         final_right = new_right
-                        # Продолжаем искать еще более внешние рамки
+                        # Continue looking for even more outer frames
                         continue
                     else:
-                        # Больше нет внешних рамок
+                        # No more outer frames
                         break
 
-            # Проверяем, что вертикальные границы продолжаются
+            # Check that vertical borders continue
             if len(line) <= final_left or line[final_left] != '│':
                 break
             if len(line) <= final_right or line[final_right] != '│':
                 break
 
-        # Ищем САМУЮ ВНЕШНЮЮ нижнюю границу для найденных границ
+        # Find the OUTERMOST bottom border for found borders
         bottom_row = None
         last_row, _ = self.view.rowcol(self.view.size())
 
         for r in range(row + 1, min(row + 100, last_row + 1)):
             line = self.get_line_text(r)
 
-            # Проверяем, есть ли на этой строке нижняя граница
+            # Check if this line has bottom border
             if len(line) > final_left and len(line) > final_right:
                 if line[final_left] == '└' and line[final_right] == '┘':
                     bottom_row = r
                     break
 
-            # Проверяем, что вертикальные границы продолжаются
+            # Check that vertical borders continue
             if len(line) <= final_left or line[final_left] != '│':
                 break
             if len(line) <= final_right or line[final_right] != '│':
                 break
 
-        # Обновляем границы на найденные
+        # Update borders to found ones
         left_border_col = final_left
         right_border_col = final_right
 
         if top_row is None or bottom_row is None:
-            sublime.status_message("Не удалось найти границы рамки (top={}, bottom={})".format(top_row, bottom_row))
+            sublime.status_message("Could not find frame borders (top={}, bottom={})".format(top_row, bottom_row))
             return
 
-        # Извлекаем содержимое из рамки
+        # Extract content from frame
         result_lines = []
 
-        # Обрабатываем верхнюю строку рамки
+        # Process top frame line
         top_line = self.get_line_text(top_row)
         before_top = top_line[:left_border_col] if left_border_col > 0 else ""
         after_top = top_line[right_border_col + 1:] if right_border_col + 1 < len(top_line) else ""
 
-        # Если есть текст до или после верхней границы, сохраняем его
+        # If there's text before or after top border, save it
         if before_top.strip() or after_top.strip():
             combined = before_top.rstrip()
             if after_top.strip():
@@ -162,20 +161,20 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
             if combined.strip():
                 result_lines.append(combined)
 
-        # Извлекаем содержимое между верхней и нижней границами
+        # Extract content between top and bottom borders
         for r in range(top_row + 1, bottom_row):
             line = self.get_line_text(r)
-            # Извлекаем текст между конкретными позициями │ ... │
+            # Extract text between specific positions │ ... │
             if len(line) > right_border_col and line[left_border_col] == '│' and line[right_border_col] == '│':
-                # Извлекаем содержимое между левой и правой границей
+                # Extract content between left and right border
                 content_start = left_border_col + 1
                 content_end = right_border_col
 
-                # Пропускаем пробелы после левой границы
+                # Skip spaces after left border
                 if content_start < len(line) and line[content_start] == ' ':
                     content_start += 1
 
-                # Пропускаем пробел перед правой границей
+                # Skip space before right border
                 if content_end > 0 and line[content_end - 1] == ' ':
                     content_end -= 1
 
@@ -185,12 +184,12 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
                 else:
                     result_lines.append("")
 
-        # Обрабатываем нижнюю строку рамки
+        # Process bottom frame line
         bottom_line = self.get_line_text(bottom_row)
         before_bottom = bottom_line[:left_border_col] if left_border_col > 0 else ""
         after_bottom = bottom_line[right_border_col + 1:] if right_border_col + 1 < len(bottom_line) else ""
 
-        # Если есть текст до или после нижней границы, сохраняем его
+        # If there's text before or after bottom border, save it
         if before_bottom.strip() or after_bottom.strip():
             combined = before_bottom.rstrip()
             if after_bottom.strip():
@@ -198,33 +197,33 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
             if combined.strip():
                 result_lines.append(combined)
 
-        # Формируем результат
+        # Form result
         result = '\n'.join(result_lines) if result_lines else ""
 
-        # Заменяем рамку на содержимое
+        # Replace frame with content
         start_point = self.view.text_point(top_row, 0)
         end_point = self.view.line(self.view.text_point(bottom_row, 0)).end()
         replace_region = sublime.Region(start_point, end_point)
 
         self.view.replace(edit, replace_region, result)
-        sublime.status_message("Рамка удалена")
+        sublime.status_message("Frame removed")
 
     def add_frame(self, edit, region):
-        """Добавляет рамку вокруг выделения"""
+        """Add frame around selection."""
         begin_row, begin_col = self.view.rowcol(region.begin())
         end_row, end_col = self.view.rowcol(region.end())
 
         selected_text = self.view.substr(region)
 
         if begin_row == end_row:
-            # Однострочное выделение
+            # Single line selection
             self.add_single_line_frame(edit, region, selected_text, begin_col)
         else:
-            # Многострочное выделение
+            # Multiline selection
             self.add_multiline_frame(edit, region, selected_text, begin_col)
 
     def add_single_line_frame(self, edit, region, text, indent_col):
-        """Добавляет рамку для однострочного текста"""
+        """Add frame for single line text."""
         width = len(text)
         top_border = "┌" + "─" * (width + 2) + "┐"
         middle_line = "│ " + text + " │"
@@ -234,10 +233,10 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
         framed_text = indent + top_border + "\n" + indent + middle_line + "\n" + indent + bottom_border
 
         self.view.replace(edit, region, framed_text)
-        sublime.status_message("Рамка добавлена")
+        sublime.status_message("Frame added")
 
     def add_multiline_frame(self, edit, region, text, indent_col):
-        """Добавляет рамку для многострочного текста"""
+        """Add frame for multiline text."""
         lines = text.split('\n')
         max_width = max(len(line) for line in lines) if lines else 0
 
@@ -254,11 +253,11 @@ class ToggleFrameCommand(sublime_plugin.TextCommand):
         framed_text = '\n'.join(indent + line for line in framed_lines)
 
         self.view.replace(edit, region, framed_text)
-        sublime.status_message("Рамка добавлена")
+        sublime.status_message("Frame added")
 
     def get_line_text(self, row):
-        """Получает текст строки по номеру"""
-        # Получаем общее количество строк через последнюю точку файла
+        """Get text of line by row number."""
+        # Get total number of lines via last point in file
         last_row, _ = self.view.rowcol(self.view.size())
 
         if row < 0 or row > last_row:
