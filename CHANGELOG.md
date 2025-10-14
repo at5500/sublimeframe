@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - Updated README with MIT license badge and acknowledgments
 - Added demo GIF with border styling
 - Enhanced project description as starting point for plugin development
+- Optimized demo GIF size (50% smaller, 1.5x faster playback)
 
 ### Fixed
 - Removed unused import (re module)
