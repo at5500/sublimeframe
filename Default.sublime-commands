@@ -1,0 +1,6 @@
+[
+    {
+        "caption": "SublimeFrame: Toggle Frame",
+        "command": "toggle_frame"
+    }
+]

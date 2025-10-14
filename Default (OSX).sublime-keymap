@@ -1,0 +1,6 @@
+[
+    {
+        "keys": ["super+shift+f"],
+        "command": "toggle_frame"
+    }
+]
